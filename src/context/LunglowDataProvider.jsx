@@ -376,7 +376,16 @@ export function LunglowDataProvider({ children }) {
       .then((d) => {
         if (d?.challenge) setChallenges((prev) => prev.map((c) => (c.id === challengeId ? d.challenge : c)));
       })
-      .catch(() => {});
+      .catch(() => {
+        // Revert the optimistic toggle and surface the failure — otherwise the
+        // UI claims "joined" while nothing was ever written to the database.
+        setChallenges((prev) => prev.map((c) => (c.id === challengeId ? target ?? c : c)));
+        showToast(
+          lang === 'my'
+            ? 'စိန်ခေါ်မှု ပါဝင်မှု မအောင်မြင်ပါ — နောက်ပိုင်း ထပ်ကြိုးစားပါ'
+            : 'Could not join the challenge — please try again.'
+        );
+      });
     if (target && !target.joined) {
       showToast(lang === 'my' ? 'စိန်ခေါ်မှုတွင် ပါဝင်ပြီးပါပြီ! ကံကောင်းပါစေ!' : 'Joined the challenge — good luck!');
     }
@@ -412,6 +421,19 @@ export function LunglowDataProvider({ children }) {
         return { ...c, progress: nextProgress, lastLogDate: todayKey };
       })
     );
+    // Persist the clean day to the backend, then reconcile from the canonical
+    // server record so progress/lastLogDate survive a refresh. Revert on error.
+    api.logChallengeDay(challengeId)
+      .then((d) => {
+        if (d?.challenge) setChallenges((prev) => prev.map((c) => (c.id === challengeId ? d.challenge : c)));
+      })
+      .catch((err) => {
+        setChallenges((prev) => prev.map((c) => (c.id === challengeId ? target ?? c : c)));
+        showToast(
+          err?.message ||
+            (lang === 'my' ? 'မှတ်သားမှု မအောင်မြင်ပါ — ထပ်ကြိုးစားပါ' : 'Could not log this day — please try again.')
+        );
+      });
   };
 
   // User Requests inbox (user submits → admin reviews)

@@ -2,6 +2,27 @@
 
 A responsive React + Tailwind CSS web application structured with separated `components/`, `context/`, `data/`, `hooks/`, `libs/`, `pages/`, and `types/` directories.
 
+## Run
+```bash
+npm install
+npm run dev   # Vite on http://localhost:5173
+```
+Make sure `.env` points at the backend API:
+```
+VITE_API_URL=http://127.0.0.1:8001/api
+```
+The backend must be running (`php artisan serve --port=8001`) or login/register
+will show a network error.
+
+## Seeded accounts
+| Role   | Email                  | Password   |
+|--------|------------------------|------------|
+| Admin  | admin@lunglow.dev      | admin123   |
+| Member | heinhtet@lunglow.dev   | password   |
+
+> Use the **Admin** credentials on the admin login form, and the **Member**
+> credentials on the normal user login / register forms.
+
 ## Project Structure
 
 ```text
