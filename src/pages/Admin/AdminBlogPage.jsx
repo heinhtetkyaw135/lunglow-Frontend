@@ -29,17 +29,23 @@ export function AdminBlogPage() {
   const handleAdminBlogSubmit = (e) => {
     e.preventDefault();
     if (!blogTitle.trim() && !blogContent.trim()) return;
-    handleCreateBlog({
+    const result = handleCreateBlog({
       title: blogTitle || 'Official Lunglow Health Advisory',
       category: blogCategory,
       content: blogContent,
       image: blogPhoto,
     });
-    setBlogTitle('');
-    setBlogContent('');
-    setBlogPhoto(null);
-    setPublishedTick(true);
-    setTimeout(() => setPublishedTick(false), 2600);
+    // Only reset the form + show the success tick when the API actually
+    // accepted the article; otherwise keep the draft so nothing is lost.
+    Promise.resolve(result)
+      .then(() => {
+        setBlogTitle('');
+        setBlogContent('');
+        setBlogPhoto(null);
+        setPublishedTick(true);
+        setTimeout(() => setPublishedTick(false), 2600);
+      })
+      .catch(() => {});
   };
 
   return (

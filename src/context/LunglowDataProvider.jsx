@@ -25,7 +25,7 @@ import {
   calculateWeekBars,
   calculateCalendarMonth,
 } from '../libs/smokingAnalytics';
-import api, { getToken, dataUrlToFile } from '../libs/api';
+import api, { getToken, setToken, dataUrlToFile } from '../libs/api';
 import { useTheme } from '../hooks/useTheme';
 import { useAuth } from '../hooks/useAuth';
 import { useExerciseTimer } from '../hooks/useExerciseTimer';
@@ -603,7 +603,13 @@ export function LunglowDataProvider({ children }) {
   };
 
   // Blog Actions (Create, Like, Delete, Comment)
+  // Returns the create promise (or null when not signed in) so callers can
+  // react to success/failure instead of assuming the publish worked.
   const handleCreateBlog = ({ title, category, content, image, images }) => {
+    if (!getToken()) {
+      showToast(lang === 'my' ? 'ဆောင်းပါးတင်ရန် အကောင့်ဝင်ပါ' : 'Please sign in to publish a blog');
+      return null;
+    }
     const photoList = Array.isArray(images) && images.length > 0 ? images : (image ? [image] : []);
     const fd = new FormData();
     fd.append('title', title.trim() || 'Untitled Lunglow Article');
@@ -613,14 +619,31 @@ export function LunglowDataProvider({ children }) {
       const f = dataUrlToFile(src, `blog-${i}.png`);
       if (f) fd.append('images[]', f);
     });
-    api.createBlog(fd)
-      .then((d) => { if (d?.blog) setBlogs((prev) => [d.blog, ...prev]); })
-      .catch(() => {});
-    showToast(
-      lang === 'my'
-        ? 'ဘလော့ဂ်ဆောင်းပါးအသစ် တင်ပြီးပါပြီ!'
-        : 'Published new blog article!'
-    );
+    return api.createBlog(fd)
+      .then((d) => {
+        if (d?.blog) {
+          setBlogs((prev) => {
+            const next = [d.blog, ...prev];
+            persistTrackerStorage({ blogs: next });
+            return next;
+          });
+          showToast(
+            lang === 'my'
+              ? 'ဘလော့ဂ်ဆောင်းပါးအသစ် တင်ပြီးပါပြီ!'
+              : 'Published new blog article!'
+          );
+        }
+      })
+      .catch((err) => {
+        // Clear a stale/expired token so the next publish re-authenticates cleanly.
+        if (err?.status === 401) setToken(null);
+        showToast(
+          lang === 'my'
+            ? 'ဆောင်းပါးတင်၍မရပါ - ထပ်ကြိုးစားပါ'
+            : (err?.message || 'Could not publish blog. Please try again.')
+        );
+        throw err;
+      });
   };
 
   const handleToggleBlogLike = (blogId) => {

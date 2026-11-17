@@ -70,17 +70,23 @@ export function BlogPage() {
   const handlePublish = (e) => {
     e.preventDefault();
     if (!title.trim() && !content.trim()) return;
-    handleCreateBlog({
+    const result = handleCreateBlog({
       title: title || 'Smoke-Free Health Update',
       category,
       content: content || 'Every clean day helps your lungs recover and glow.',
       image: coverPhotos[0] || null,
       images: coverPhotos,
     });
-    setTitle('');
-    setContent('');
-    setCoverPhotos([]);
-    setShowEditor(false);
+    // Only reset the composer when the API actually accepted the article;
+    // otherwise keep the draft so the user can retry without retyping.
+    Promise.resolve(result)
+      .then(() => {
+        setTitle('');
+        setContent('');
+        setCoverPhotos([]);
+        setShowEditor(false);
+      })
+      .catch(() => {});
   };
 
   const openProfile = (blog) =>
