@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { SunIcon, MoonIcon, BellIcon } from '../common/Icons';
+import { SunIcon, MoonIcon, BellIcon, TrashCanIcon } from '../common/Icons';
 import { useTheme } from '../../hooks/useTheme';
 import { useLunglowData } from '../../hooks/useLunglowData';
 
@@ -7,6 +7,11 @@ const NOTIF_KIND_COLOR = {
   broadcast: 'bg-[#CABA3A]',
   report: 'bg-[#FF3B30]',
   request: 'bg-[#5FB032]',
+  'peak-craving': 'bg-[#FF9500]',
+  goal: 'bg-[#4C9AFF]',
+  reaction: 'bg-[#FF3B30]',
+  comment: 'bg-[#AF52DE]',
+  challenge: 'bg-[#CABA3A]',
   info: 'bg-[#5FB032]',
 };
 
@@ -18,6 +23,7 @@ export function TopControls() {
     setNotifOpen,
     unreadNotifCount,
     markAllNotifsRead,
+    deleteNotification,
     clearNotifications,
   } = useLunglowData();
 
@@ -113,8 +119,10 @@ export function TopControls() {
                 notifications.map((n) => (
                   <div
                     key={n.id}
-                    className={`flex items-start gap-3 px-5 py-3.5 border-b last:border-b-0 ${
-                      isLight ? 'border-[#2E5A1C]/8' : 'border-white/8'
+                    className={`group flex items-start gap-3 px-5 py-3.5 border-b last:border-b-0 ${
+                      isLight
+                        ? `border-[#2E5A1C]/8 ${n.read ? '' : 'bg-[#5FB032]/5'}`
+                        : `border-white/8 ${n.read ? '' : 'bg-[#5FB032]/8'}`
                     }`}
                   >
                     <span className={`mt-1.5 w-2.5 h-2.5 rounded-full shrink-0 ${NOTIF_KIND_COLOR[n.kind] || NOTIF_KIND_COLOR.info}`} />
@@ -123,6 +131,19 @@ export function TopControls() {
                       <p className={`text-xs sm:text-[13px] leading-snug break-words mt-0.5 ${isLight ? 'text-[#284224]/80' : 'text-white/75'}`}>{n.body}</p>
                       <p className={`text-[10px] mt-1 ${isLight ? 'text-[#284224]/50' : 'text-white/45'}`}>{n.time}</p>
                     </div>
+                    <button
+                      type="button"
+                      onClick={() => deleteNotification(n.id)}
+                      aria-label={`${t.notif.deleteLabel}: ${n.title}`}
+                      title={t.notif.deleteLabel}
+                      className={`shrink-0 mt-0.5 w-7 h-7 rounded-full flex items-center justify-center transition ${
+                        isLight
+                          ? 'text-[#284224]/45 hover:text-[#B3261E] hover:bg-[#B3261E]/10'
+                          : 'text-white/45 hover:text-[#FF6B6B] hover:bg-[#FF6B6B]/15'
+                      }`}
+                    >
+                      <TrashCanIcon className="w-4 h-4" />
+                    </button>
                   </div>
                 ))
               )}

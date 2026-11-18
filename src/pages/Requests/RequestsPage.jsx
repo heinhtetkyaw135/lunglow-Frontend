@@ -3,6 +3,7 @@ import { SendIcon, InboxIcon, CheckCircleIcon } from '../../components/common/Ic
 import { useTheme } from '../../hooks/useTheme';
 import { useAuth } from '../../hooks/useAuth';
 import { useLunglowData } from '../../hooks/useLunglowData';
+import { getToken } from '../../libs/api';
 
 const CATEGORY_KEYS = ['feature', 'challenge', 'account', 'bug', 'other'];
 const CATEGORY_VALUES = {
@@ -29,16 +30,21 @@ export function RequestsPage() {
   const [message, setMessage] = useState('');
   const [sentTick, setSentTick] = useState(false);
 
-  const myRequests = userRequests.filter((r) => r.user === userName);
+  // With a session the API already scopes /requests to the signed-in member,
+  // so show everything; demo mode still filters the shared mock list by name.
+  const myRequests = getToken()
+    ? userRequests
+    : userRequests.filter((r) => r.user === userName);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!subject.trim() || !message.trim()) return;
-    handleSubmitUserRequest({
+    const ok = await handleSubmitUserRequest({
       category: t.requests.categories[category] || CATEGORY_VALUES[category],
       subject,
       message,
     });
+    if (!ok) return;
     setSubject('');
     setMessage('');
     setCategory('feature');

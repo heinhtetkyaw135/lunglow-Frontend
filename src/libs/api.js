@@ -94,7 +94,12 @@ export const api = {
   // ---- Broadcast ----
   getBroadcast: () => request('/broadcast'),
 
-  // ---- Real-time peak-craving notifications (polled every ~30s) ----
+  // ---- Notifications (persisted history + peak-craving poll) ----
+  getNotifications: () => request('/notifications'),
+  createNotification: (payload) => request('/notifications', { method: 'POST', body: payload }),
+  markAllNotificationsRead: () => request('/notifications/read-all', { method: 'POST' }),
+  deleteNotification: (id) => request(`/notifications/${id}`, { method: 'DELETE' }),
+  clearNotifications: () => request('/notifications', { method: 'DELETE' }),
   getDueNotifications: () => request('/notifications/due'),
 
   // ---- Reports & requests ----

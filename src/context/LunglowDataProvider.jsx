@@ -99,10 +99,12 @@ export function LunglowDataProvider({ children }) {
   }, []);
 
   const [toastMessage, setToastMessage] = useState('');
+  const [toastTone, setToastTone] = useState('success'); // 'success' | 'error'
   const [logoutModalOpen, setLogoutModalOpen] = useState(false);
 
-  const showToast = useCallback((msg) => {
+  const showToast = useCallback((msg, tone = 'success') => {
     setToastMessage(msg);
+    setToastTone(tone);
     setTimeout(() => setToastMessage(''), 3000);
   }, []);
 
@@ -441,22 +443,37 @@ export function LunglowDataProvider({ children }) {
     __cached.userRequests ?? (hasSession() ? [] : INITIAL_USER_REQUESTS)
   );
 
+  // Returns a Promise that resolves true on success, false on failure,
+  // so the form can show its "sent" state only after the API confirms.
   const handleSubmitUserRequest = ({ category, subject, message }) => {
-    api.submitRequest({ category, subject: subject.trim(), message: message.trim() })
+    return api.submitRequest({ category, subject: subject.trim(), message: message.trim() })
       .then((d) => {
-        if (d?.request) setUserRequests((prev) => [d.request, ...prev]);
+        if (!d?.request?.user) return false;
+        setUserRequests((prev) => {
+          const next = [d.request, ...prev.filter((r) => r.id !== d.request.id)];
+          persistTrackerStorage({ userRequests: next });
+          return next;
+        });
+        pushNotification({
+          title: lang === 'my' ? 'တောင်းဆိုချက် အသစ်' : 'New User Request',
+          body: subject.trim() || (lang === 'my' ? 'တောင်းဆိုချက် တစ်ခု ရောက်ရှိပါသည်' : 'A user sent a new request.'),
+          kind: 'request',
+        });
+        showToast(
+          lang === 'my'
+            ? 'သင့်တောင်းဆိုချက်ကို Admin ထံ ပေးပို့ပြီးပါပြီ!'
+            : 'Your request was sent to the Admin team!'
+        );
+        return true;
       })
-      .catch(() => {});
-    pushNotification({
-      title: lang === 'my' ? 'တောင်းဆိုချက် အသစ်' : 'New User Request',
-      body: subject.trim() || (lang === 'my' ? 'တောင်းဆိုချက် တစ်ခု ရောက်ရှိပါသည်' : 'A user sent a new request.'),
-      kind: 'request',
-    });
-    showToast(
-      lang === 'my'
-        ? 'သင့်တောင်းဆိုချက်ကို Admin ထံ ပေးပို့ပြီးပါပြီ!'
-        : 'Your request was sent to the Admin team!'
-    );
+      .catch((err) => {
+        showToast(
+          lang === 'my' ? 'ပေးပို့မှု မအောင်မြင်ပါ — ထပ်ကြိုးစားပါ' : 'Could not send your request — please try again.',
+          'error'
+        );
+        console.error('submitRequest failed:', err);
+        return false;
+      });
   };
 
   const handleAdminUpdateRequestStatus = (requestId, nextStatus) => {
@@ -500,22 +517,80 @@ export function LunglowDataProvider({ children }) {
     showToast(lang === 'my' ? 'ကြေညာချက် ရပ်တန့်ပြီးပါပြီ' : 'Broadcast cleared');
   };
 
-  // Notification center — shared for user & admin dashboards
+  // Notification center — shared for user & admin dashboards.
+  // Persisted: every notification lives in the DB and is reloaded on mount,
+  // so the panel always shows the full history.
   const [notifications, setNotifications] = useState([]);
   const [notifOpen, setNotifOpen] = useState(false);
 
-  const pushNotification = useCallback(({ title, body, kind = 'info' }) => {
-    setNotifications((prev) => [
-      { id: `n-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, title, body, kind, read: false, time: 'Just now' },
-      ...prev,
-    ].slice(0, 30));
+  const normalizeNotification = (n) => ({
+    id: n.id,
+    title: n.title,
+    body: n.body,
+    kind: n.kind || 'info',
+    read: typeof n.read === 'boolean' ? n.read : n.read_at != null,
+    time: n.createdAt || n.time || 'Just now',
+    createdAt: n.createdAt || null,
+  });
+
+  const loadNotifications = useCallback(() => {
+    if (!getToken()) return Promise.resolve();
+    return api.getNotifications()
+      .then((d) => {
+        if (Array.isArray(d?.notifications)) {
+          setNotifications(d.notifications.map(normalizeNotification));
+        }
+      })
+      .catch(() => {});
   }, []);
+
+  // Cache first paint, then hydrate from the server. Re-run when the
+  // signed-in user changes so a fresh login pulls that member's history.
+  useEffect(() => {
+    const cached = loadTrackerStorage()?.notifications;
+    if (Array.isArray(cached) && cached.length) setNotifications(cached);
+    loadNotifications();
+  }, [loadNotifications, authUser?.id, authUser?.email]);
+
+  const pushNotification = useCallback(({ title, body, kind = 'info' }) => {
+    // Optimistic local entry; the server row replaces it once created.
+    const localId = `local-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+    const entry = { id: localId, title, body, kind, read: false, time: 'Just now', createdAt: null };
+    setNotifications((prev) => [entry, ...prev]);
+
+    if (getToken()) {
+      api.createNotification({ title, body, kind })
+        .then((d) => {
+          if (!d?.notification) return;
+          setNotifications((prev) =>
+            prev.map((n) => (n.id === localId ? normalizeNotification(d.notification) : n))
+          );
+        })
+        .catch(() => {});
+    }
+  }, []);
+
+  useEffect(() => {
+    if (notifications.length) persistTrackerStorage({ notifications });
+  }, [notifications]);
 
   const unreadNotifCount = notifications.filter((n) => !n.read).length;
   const markAllNotifsRead = useCallback(() => {
     setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+    if (getToken()) api.markAllNotificationsRead().catch(() => {});
   }, []);
-  const clearNotifications = useCallback(() => setNotifications([]), []);
+
+  const deleteNotification = useCallback((id) => {
+    setNotifications((prev) => prev.filter((n) => n.id !== id));
+    if (getToken() && /^n-\d+$/.test(id)) {
+      api.deleteNotification(id).catch(() => {});
+    }
+  }, []);
+
+  const clearNotifications = useCallback(() => {
+    setNotifications([]);
+    if (getToken()) api.clearNotifications().catch(() => {});
+  }, []);
 
   // ---- Real-time peak-craving alerts -----------------------------------
   // Polls /notifications/due every 30s while logged in. The backend marks a
@@ -551,14 +626,19 @@ export function LunglowDataProvider({ children }) {
         .then((d) => {
           const due = Array.isArray(d?.notifications) ? d.notifications : [];
           if (!due.length) return;
-          due.forEach((n) => {
-            const { title, body } =
-              n.kind === 'peak-craving' ? buildText(n.meta) : { title: n.title, body: n.body };
-            setNotifications((prev) => [
-              { id: n.id, title, body, kind: n.kind, read: false, time: 'Just now' },
-              ...prev,
-            ].slice(0, 30));
-            fireBrowser(title, body);
+          // A just-fetched row may already be in the history list (same id),
+          // so only add ids we don't have yet.
+          setNotifications((prev) => {
+            const seen = new Set(prev.map((n) => n.id));
+            const fresh = due
+              .filter((n) => !seen.has(n.id))
+              .map((n) => {
+                const { title, body } =
+                  n.kind === 'peak-craving' ? buildText(n.meta) : { title: n.title, body: n.body };
+                fireBrowser(title, body);
+                return normalizeNotification({ ...n, title, body });
+              });
+            return fresh.length ? [...fresh, ...prev] : prev;
           });
         })
         .catch(() => {});
@@ -1225,6 +1305,7 @@ export function LunglowDataProvider({ children }) {
         page,
         setPage,
         toastMessage,
+        toastTone,
         showToast,
         logoutModalOpen,
         setLogoutModalOpen,
@@ -1320,6 +1401,7 @@ export function LunglowDataProvider({ children }) {
         pushNotification,
         unreadNotifCount,
         markAllNotifsRead,
+        deleteNotification,
         clearNotifications,
         handlePhotoUpload,
         handleSaveProfileName,

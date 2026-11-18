@@ -35,6 +35,7 @@ export const I18N = {
       panelTitle: 'Notifications',
       clearAll: 'Clear all',
       empty: 'You’re all caught up — no notifications yet.',
+      deleteLabel: 'Delete notification',
     },
     common: {
       seeMore: 'See more',
@@ -584,6 +585,7 @@ export const I18N = {
       panelTitle: 'အသိပေးချက်များ',
       clearAll: 'အားလုံး ဖျက်မည်',
       empty: 'အသိပေးချက် မရှိသေးပါ — အားလုံး ဖတ်ပြီးပါပြီ။',
+      deleteLabel: 'အသိပေးချက် ဖျက်မည်',
     },
     common: {
       seeMore: 'ဆက်ကြည့်ရန်',
