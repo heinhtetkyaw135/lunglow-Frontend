@@ -1,7 +1,8 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { AuthContext } from './auth-context';
 import { ASSETS } from '../types';
-import api, { getToken, setToken } from '../libs/api';
+import api, { getToken, setToken, getCachedUser, setCachedUser } from '../libs/api';
+import { clearTrackerStorage } from '../data/trackerData';
 
 export function AuthProvider({ children }) {
   const [authEmail, setAuthEmail] = useState('');
@@ -11,46 +12,101 @@ export function AuthProvider({ children }) {
   const [authLoading, setAuthLoading] = useState(false);
 
   // Separate auth state — the admin console is a fully gated site.
-  const [adminLoggedIn, setAdminLoggedIn] = useState(false);
-  const [authUser, setAuthUser] = useState(null);
-  const [resistedCount, setResistedCount] = useState(0);
+  const [adminLoggedIn, setAdminLoggedIn] = useState(() => !!getToken({ admin: true }));
+  // Seed from the cached profile so a refresh shows the real user immediately
+  // instead of the placeholder name until /me responds.
+  const [authUser, setAuthUser] = useState(() => (getToken() ? getCachedUser() : null));
+  const [resistedCount, setResistedCount] = useState(
+    () => (getToken() ? getCachedUser()?.resisted_count ?? 0 : 0)
+  );
 
   const [role, setRole] = useState(() =>
     typeof window !== 'undefined' && window.location.pathname.startsWith('/admin') ? 'admin' : 'member'
   ); // 'member' | 'admin'
-  const [userName, setUserName] = useState('Hein Htet Kyaw');
-  const [userAvatar, setUserAvatar] = useState(ASSETS.avatar);
+  const [userName, setUserName] = useState(
+    () => getCachedUser()?.name || 'Hein Htet Kyaw'
+  );
+  const [userAvatar, setUserAvatar] = useState(
+    () => getCachedUser()?.avatar || ASSETS.avatar
+  );
   const [isEditingProfile, setIsEditingProfile] = useState(false);
-  const [tempName, setTempName] = useState('Hein Htet Kyaw');
+  const [tempName, setTempName] = useState(
+    () => getCachedUser()?.name || 'Hein Htet Kyaw'
+  );
   const fileInputRef = useRef(null);
 
   const isAdmin = role === 'admin';
   const toggleRole = () => setRole((prev) => (prev === 'admin' ? 'member' : 'admin'));
 
-  // Restore the session from a persisted Sanctum token on first load.
-  useEffect(() => {
-    if (!getToken()) return;
+  // Sync user state whenever the surface (/admin vs /user) has a token.
+  const syncSession = useCallback(() => {
+    const onAdmin = typeof window !== 'undefined' && window.location.pathname.startsWith('/admin');
+    const token = getToken({ admin: onAdmin });
+    if (!token) {
+      if (!onAdmin) {
+        setAuthUser(null);
+      }
+      return;
+    }
+    const cached = getCachedUser({ admin: onAdmin });
+    if (cached) {
+      setAuthUser(cached);
+      setUserName(cached.name);
+      setTempName(cached.name);
+      if (cached.avatar) setUserAvatar(cached.avatar);
+      setRole(onAdmin && cached.role === 'admin' ? 'admin' : 'member');
+      if (cached.role === 'admin') setAdminLoggedIn(true);
+      if (typeof cached.resisted_count === 'number') setResistedCount(cached.resisted_count);
+    }
     api.me()
       .then(({ user }) => {
         if (!user) return;
+        const prevId = getCachedUser({ admin: onAdmin })?.id;
+        if (!onAdmin && prevId && String(prevId) !== String(user.id)) {
+          clearTrackerStorage();
+        }
+        setCachedUser(user, { admin: onAdmin });
         setAuthUser(user);
         setUserName(user.name);
         setTempName(user.name);
         if (user.avatar) setUserAvatar(user.avatar);
-        setRole(user.role === 'admin' ? 'admin' : 'member');
+        setRole(onAdmin && user.role === 'admin' ? 'admin' : 'member');
         if (user.role === 'admin') setAdminLoggedIn(true);
         if (typeof user.resisted_count === 'number') setResistedCount(user.resisted_count);
       })
-      .catch(() => setToken(null));
+      .catch((err) => {
+        // Only clear the token if the server explicitly rejected it (401/403),
+        // not on transient network hiccups during refresh.
+        if (err?.status === 401 || err?.status === 403) {
+          setToken(null, { admin: onAdmin });
+          setCachedUser(null, { admin: onAdmin });
+          if (!onAdmin) {
+            clearTrackerStorage();
+            setResistedCount(0);
+          }
+          setAuthUser(null);
+          if (onAdmin) setAdminLoggedIn(false);
+        }
+      });
   }, []);
 
-  const applyAuthUser = (user, token) => {
-    setToken(token);
+  // Restore the session from a persisted Sanctum token on first load.
+  useEffect(() => {
+    syncSession();
+  }, [syncSession]);
+
+  const applyAuthUser = (user, token, { admin = false } = {}) => {
+    const prevId = getCachedUser({ admin })?.id;
+    if (!admin && prevId && String(prevId) !== String(user?.id)) {
+      clearTrackerStorage();
+    }
+    setToken(token, { admin });
+    setCachedUser(user, { admin });
     setAuthUser(user);
     setUserName(user.name);
     setTempName(user.name);
-    if (user.avatar) setUserAvatar(user.avatar);
-    setRole(user.role === 'admin' ? 'admin' : 'member');
+    setUserAvatar(user.avatar || ASSETS.avatar);
+    setRole(admin && user.role === 'admin' ? 'admin' : 'member');
     if (typeof user.resisted_count === 'number') setResistedCount(user.resisted_count);
   };
 
@@ -95,7 +151,7 @@ export function AuthProvider({ children }) {
     setAuthError('');
     try {
       const { user, token } = await api.adminLogin({ email: authEmail, password: authPassword });
-      applyAuthUser(user, token);
+      applyAuthUser(user, token, { admin: true });
       setAdminLoggedIn(true);
       return true;
     } catch (err) {
@@ -107,10 +163,16 @@ export function AuthProvider({ children }) {
   };
 
   const logout = async () => {
+    const onAdmin = isAdmin || (typeof window !== 'undefined' && window.location.pathname.startsWith('/admin'));
     try { await api.logout(); } catch { /* token already invalid */ }
-    setToken(null);
+    setToken(null, { admin: onAdmin });
+    setCachedUser(null, { admin: onAdmin });
+    if (!onAdmin) {
+      clearTrackerStorage();
+      setResistedCount(0);
+    }
     setAuthUser(null);
-    setAdminLoggedIn(false);
+    if (onAdmin) setAdminLoggedIn(false);
   };
 
   return (
@@ -132,6 +194,7 @@ export function AuthProvider({ children }) {
         register,
         adminLogin,
         logout,
+        syncSession,
         adminLoggedIn,
         setAdminLoggedIn,
         role,

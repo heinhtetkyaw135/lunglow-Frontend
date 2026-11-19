@@ -1,22 +1,27 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { DownloadIcon, ChartBarIcon, FlameIcon, UsersGroupIcon, FlagReportIcon } from '../../components/common/Icons';
 import { CountUp, MiniLineChart, MiniBarChart, DonutChart } from '../../components/common/Charts';
 import { useTheme } from '../../hooks/useTheme';
 import { useLunglowData } from '../../hooks/useLunglowData';
 
-const SIGNUP_TREND = [42, 55, 48, 63, 71, 66, 84, 79, 92, 105, 98, 121];
-const DAILY_ACTIVE = [510, 540, 575, 560, 610, 640, 690, 655, 720, 760, 810, 838];
-
 export function AdminAnalyticsPage() {
   const { t, themeTokens } = useTheme();
-  const { blogs, posts, reports, managedUsers, challenges, userRequests, showToast, lang } = useLunglowData();
+  const { blogs, posts, reports, managedUsers, adminAnalytics, refreshAdminAnalytics, challenges, userRequests, showToast, lang } = useLunglowData();
 
-  const totalRegisteredUsers = 1280 + managedUsers.length;
-  const activeUsersCount = 838 + managedUsers.filter((u) => u.status === 'active').length;
+  // Always show fresh numbers when the analytics page opens.
+  useEffect(() => { refreshAdminAnalytics(); }, [refreshAdminAnalytics]);
+
+  const a = adminAnalytics || {};
+  const SIGNUP_TREND = a.signups_weekly?.length ? a.signups_weekly : new Array(12).fill(0);
+  const DAILY_ACTIVE = a.daily_active?.length ? a.daily_active : new Array(14).fill(0);
+
+  const members = managedUsers.filter((u) => u.role !== 'admin');
+  const totalRegisteredUsers = members.length;
+  const activeUsersCount = members.filter((u) => u.status === 'active').length;
   const pendingReportsCount = reports.length;
   const totalPublishedItems = blogs.length + posts.length;
   const liveChallenges = challenges.filter((c) => c.active).length;
-  const totalParticipants = challenges.reduce((s, c) => s + c.participants, 0);
+  const totalParticipants = a.challenge_participants ?? 0;
 
   const handleExportCSV = () => {
     const rows = [
@@ -44,7 +49,13 @@ export function AdminAnalyticsPage() {
         liveChallenges,
         totalChallengeParticipants: totalParticipants,
       },
-      trends: { signupsWeekly: SIGNUP_TREND, dailyActive: DAILY_ACTIVE },
+      trends: {
+        signupsWeekly: SIGNUP_TREND,
+        dailyActive: DAILY_ACTIVE,
+        dailyActiveLabels: a.daily_active_labels || [],
+        weeklyEngagement: a.weekly_engagement || [],
+      },
+      analytics: adminAnalytics,
       users: managedUsers,
       reports,
       challenges,
@@ -67,10 +78,10 @@ export function AdminAnalyticsPage() {
   };
 
   const healthStats = [
-    { label: t.admin.analyticsPage.totalSavedLabel, value: '$12,480', icon: ChartBarIcon, color: '#5FB032' },
-    { label: t.admin.analyticsPage.avgStreakLabel, value: '9.6 days', icon: FlameIcon, color: '#CABA3A' },
-    { label: t.admin.analyticsPage.retentionLabel, value: '71%', icon: UsersGroupIcon, color: '#7dd3fc' },
-    { label: t.admin.analyticsPage.reportRateLabel, value: '0.8%', icon: FlagReportIcon, color: '#FF3B30' },
+    { label: t.admin.analyticsPage.totalSavedLabel, value: `$${Number(a.total_saved_money ?? 0).toLocaleString()}`, icon: ChartBarIcon, color: '#5FB032' },
+    { label: t.admin.analyticsPage.avgStreakLabel, value: `${a.avg_clean_streak ?? 0} days`, icon: FlameIcon, color: '#CABA3A' },
+    { label: t.admin.analyticsPage.retentionLabel, value: `${a.retention_rate ?? 0}%`, icon: UsersGroupIcon, color: '#7dd3fc' },
+    { label: t.admin.analyticsPage.reportRateLabel, value: `${a.report_rate ?? 0}%`, icon: FlagReportIcon, color: '#FF3B30' },
   ];
 
   const contentSplit = [
@@ -79,12 +90,9 @@ export function AdminAnalyticsPage() {
     { value: reports.length, color: '#FF3B30', label: 'Flagged' },
   ];
 
-  const weeklyEngagement = [
-    { label: 'W1', value: 310 }, { label: 'W2', value: 356 }, { label: 'W3', value: 402 },
-    { label: 'W4', value: 388 }, { label: 'W5', value: 445 }, { label: 'W6', value: 471 },
-    { label: 'W7', value: 524 }, { label: 'W8', value: 508 }, { label: 'W9', value: 559 },
-    { label: 'W10', value: 590 }, { label: 'W11', value: 612 }, { label: 'W12', value: 660 },
-  ];
+  const weeklyEngagement = (a.weekly_engagement?.length ? a.weekly_engagement : new Array(12).fill(0)).map(
+    (value, i) => ({ label: `W${i + 1}`, value })
+  );
 
   return (
     <div className="flex flex-col gap-6">
@@ -140,7 +148,8 @@ export function AdminAnalyticsPage() {
           <h2 className="text-base font-bold mb-4">Daily Active Users</h2>
           <MiniLineChart data={DAILY_ACTIVE} height={150} stroke="#CABA3A" />
           <div className={`mt-3 text-xs ${themeTokens.mutedText} font-semibold`}>
-            Peak today: <span className="text-[#CABA3A] font-bold">{Math.max(...DAILY_ACTIVE).toLocaleString()}</span>
+            Today: <span className="text-[#CABA3A] font-bold">{(DAILY_ACTIVE[DAILY_ACTIVE.length - 1] ?? 0).toLocaleString()}</span>
+            {' • '}Peak (14d): <span className="text-[#CABA3A] font-bold">{Math.max(0, ...DAILY_ACTIVE).toLocaleString()}</span>
           </div>
         </div>
 
@@ -179,7 +188,8 @@ export function AdminAnalyticsPage() {
           <ul className={`text-sm space-y-2.5 ${themeTokens.mutedText}`}>
             {[
               ['Total Registered Users', totalRegisteredUsers.toLocaleString()],
-              ['Active Users Today', activeUsersCount.toLocaleString()],
+              ['Active Members', activeUsersCount.toLocaleString()],
+              ['Active in Last 7 Days', (a.active_last_7_days ?? 0).toLocaleString()],
               ['Pending Reports', pendingReportsCount],
               ['Published Blogs & Posts', totalPublishedItems],
               ['Live Challenges', liveChallenges],

@@ -1,9 +1,11 @@
 import React, { useEffect } from 'react';
 import { useTheme } from '../../hooks/useTheme';
+import { useAuth } from '../../hooks/useAuth';
 import { useLunglowData } from '../../hooks/useLunglowData';
 
 export function LogoutModal() {
   const { isLight, t, themeTokens } = useTheme();
+  const { logout } = useAuth();
   const { logoutModalOpen, setLogoutModalOpen, setPage } = useLunglowData();
 
   useEffect(() => {
@@ -56,6 +58,7 @@ export function LogoutModal() {
             type="button"
             onClick={() => {
               setLogoutModalOpen(false);
+              logout();
               setPage('landing');
             }}
             className={`flex-1 py-3 ${themeTokens.primaryBtn}`}

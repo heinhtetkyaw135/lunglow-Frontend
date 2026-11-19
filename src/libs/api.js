@@ -5,18 +5,51 @@
 // ============================================================
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000/api';
-const TOKEN_KEY = 'lunglow_token';
+// Admin and member sessions are independent — an admin logging in on another
+// tab must NOT clobber the member's token (localStorage is shared per origin,
+// so a single key made /user pages rehydrate as the admin).
+const MEMBER_TOKEN_KEY = 'lunglow_token';
+const ADMIN_TOKEN_KEY = 'lunglow_admin_token';
 
-export function getToken() {
-  return localStorage.getItem(TOKEN_KEY);
+// Admin API surfaces live under /admin/* — pick the token that matches the
+// page this tab is showing, so each tab keeps its own session.
+const isAdminSurface = () =>
+  typeof window !== 'undefined' && window.location.pathname.startsWith('/admin');
+
+export function getToken({ admin = isAdminSurface() } = {}) {
+  return localStorage.getItem(admin ? ADMIN_TOKEN_KEY : MEMBER_TOKEN_KEY);
 }
-export function setToken(token) {
-  if (token) localStorage.setItem(TOKEN_KEY, token);
-  else localStorage.removeItem(TOKEN_KEY);
+export function setToken(token, { admin = isAdminSurface() } = {}) {
+  const key = admin ? ADMIN_TOKEN_KEY : MEMBER_TOKEN_KEY;
+  if (token) localStorage.setItem(key, token);
+  else {
+    localStorage.removeItem(key);
+    localStorage.removeItem(admin ? ADMIN_USER_KEY : MEMBER_USER_KEY);
+  }
 }
 
-async function request(path, { method = 'GET', body, headers = {}, isForm = false } = {}) {
-  const token = getToken();
+// Last-known user profile, cached so a refresh paints the right name/avatar
+// before /me round-trips (previously the UI flashed a hardcoded placeholder).
+const MEMBER_USER_KEY = 'lunglow_user';
+const ADMIN_USER_KEY = 'lunglow_admin_user';
+
+export function getCachedUser({ admin = isAdminSurface() } = {}) {
+  try {
+    const raw = localStorage.getItem(admin ? ADMIN_USER_KEY : MEMBER_USER_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+export function setCachedUser(user, { admin = isAdminSurface() } = {}) {
+  const key = admin ? ADMIN_USER_KEY : MEMBER_USER_KEY;
+  if (user) localStorage.setItem(key, JSON.stringify(user));
+  else localStorage.removeItem(key);
+}
+
+async function request(path, { method = 'GET', body, headers = {}, isForm = false, admin } = {}) {
+  const useAdmin = typeof admin === 'boolean' ? admin : (path.startsWith('/admin') || isAdminSurface());
+  const token = getToken({ admin: useAdmin });
   const res = await fetch(`${API_BASE}${path}`, {
     method,
     headers: {
@@ -43,6 +76,7 @@ async function request(path, { method = 'GET', body, headers = {}, isForm = fals
 
 export const api = {
   // ---- Auth ----
+  bootstrap: () => request('/bootstrap'),
   register: (payload) => request('/register', { method: 'POST', body: payload }),
   login: (payload) => request('/login', { method: 'POST', body: payload }),
   adminLogin: (payload) => request('/admin/login', { method: 'POST', body: payload }),

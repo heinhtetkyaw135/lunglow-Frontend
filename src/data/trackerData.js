@@ -125,6 +125,14 @@ export function persistTrackerStorage(payload) {
   }
 }
 
+export function clearTrackerStorage() {
+  try {
+    localStorage.removeItem(STORAGE_KEY);
+  } catch {
+    // Ignore storage errors
+  }
+}
+
 export const INITIAL_HEATMAP = {
   // 7 days (0=Sun..6=Sat) x 6 time blocks (0..5), values: 0 (Low/Clean), 1 (Moderate), 2 (Peak Craving)
   '0-0': 0, '0-1': 1, '0-2': 1, '0-3': 0, '0-4': 1, '0-5': 0,

@@ -29,7 +29,7 @@ const ADMIN_NAV = [
 
 export function AdminLayout({ children, activePage }) {
   const { isLight, t } = useTheme();
-  const { setAdminLoggedIn, setRole } = useAuth();
+  const { setAdminLoggedIn, setRole, logout } = useAuth();
   const { setPage, reports, userRequests, challenges, broadcast } = useLunglowData();
 
   const pendingRequests = userRequests.filter((r) => r.status === 'pending').length;
@@ -122,6 +122,7 @@ export function AdminLayout({ children, activePage }) {
             type="button"
             title={t.nav.logout}
             onClick={() => {
+              logout();
               setAdminLoggedIn(false);
               setRole('member');
               setPage('landing');

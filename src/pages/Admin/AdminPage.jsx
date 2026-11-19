@@ -16,7 +16,7 @@ import { ASSETS } from '../../types';
 import { useTheme } from '../../hooks/useTheme';
 import { useLunglowData } from '../../hooks/useLunglowData';
 
-const WEEKLY_SIGNUPS = [42, 55, 48, 63, 71, 66, 84, 79, 92, 105, 98, 121];
+const pct = (part, whole) => (whole > 0 ? Math.round((part / whole) * 100) : 0);
 
 export function AdminPage() {
   const { t, isLight, themeTokens, lang } = useTheme();
@@ -25,6 +25,7 @@ export function AdminPage() {
     posts,
     reports,
     managedUsers,
+    adminAnalytics,
     challenges,
     userRequests,
     broadcast,
@@ -39,12 +40,21 @@ export function AdminPage() {
   const [broadcastMessage, setBroadcastMessage] = useState('');
   const [userQuery, setUserQuery] = useState('');
 
-  const totalRegisteredUsers = 1280 + managedUsers.length;
-  const activeUsersCount = 838 + managedUsers.filter((u) => u.status === 'active').length;
+  const a = adminAnalytics || {};
+  // Member counts come from the live user list so suspend/activate reflects instantly.
+  const members = managedUsers.filter((u) => u.role !== 'admin');
+  const totalRegisteredUsers = members.length;
+  const activeUsersCount = members.filter((u) => u.status === 'active').length;
+  const suspendedUsersCount = totalRegisteredUsers - activeUsersCount;
+  const newThisWeek = a.new_users_this_week ?? 0;
+  const newLastWeek = a.new_users_last_week ?? 0;
   const pendingReportsCount = reports.length;
   const totalPublishedItems = blogs.length + posts.length;
   const liveChallenges = challenges.filter((c) => c.active).length;
   const openRequests = userRequests.filter((r) => r.status !== 'resolved').length;
+  const signupsWeekly = a.signups_weekly?.length ? a.signups_weekly : new Array(12).fill(0);
+  const signupChange =
+    newLastWeek > 0 ? `${newThisWeek >= newLastWeek ? '+' : ''}${pct(newThisWeek - newLastWeek, newLastWeek)}% WoW` : `+${newThisWeek} this week`;
 
   const filteredUsers = managedUsers.filter((u) =>
     u.name.toLowerCase().includes(userQuery.trim().toLowerCase()) ||
@@ -57,7 +67,7 @@ export function AdminPage() {
       value: totalRegisteredUsers,
       label: t.admin.kpiTotalUsers,
       color: 'text-white',
-      delta: '+9.4%',
+      delta: `+${newThisWeek} this week`,
       iconCls: themeTokens.iconBadge,
     },
     {
@@ -65,7 +75,7 @@ export function AdminPage() {
       value: activeUsersCount,
       label: t.admin.kpiActiveUsers,
       color: 'text-[#5FB032]',
-      delta: '+4.1%',
+      delta: `${pct(activeUsersCount, totalRegisteredUsers)}% of members`,
       iconCls: themeTokens.iconBadge,
     },
     {
@@ -83,25 +93,27 @@ export function AdminPage() {
       value: totalPublishedItems,
       label: t.admin.kpiTotalContent,
       color: 'text-[#CABA3A]',
-      delta: '+12 this week',
+      delta: `${a.total_comments ?? 0} comments`,
       iconCls:
         'w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-[#CABA3A]/15 border border-[#CABA3A]/35 text-[#CABA3A] flex items-center justify-center shrink-0',
       page: 'admin-blog',
     },
   ];
 
+  const seg = a.segments || {};
+  const segTotal = (seg.clean || 0) + (seg.reducing || 0) + (seg.struggling || 0) + (seg.inactive || 0);
   const engagementSegments = [
-    { value: 46, color: '#5FB032', label: 'Clean streaks' },
-    { value: 27, color: '#CABA3A', label: 'Reducing' },
-    { value: 17, color: '#7dd3fc', label: 'Exercising' },
-    { value: 10, color: '#FF3B30', label: 'Struggling' },
+    { value: pct(seg.clean || 0, segTotal), color: '#5FB032', label: 'Clean streaks' },
+    { value: pct(seg.reducing || 0, segTotal), color: '#CABA3A', label: 'Reducing' },
+    { value: pct(seg.struggling || 0, segTotal), color: '#FF3B30', label: 'Over limit' },
+    { value: pct(seg.inactive || 0, segTotal), color: '#7dd3fc', label: 'Not tracking' },
   ];
 
   const userBars = [
-    { label: 'Active', value: managedUsers.filter((u) => u.status === 'active').length + 831 },
-    { label: 'Suspended', value: managedUsers.filter((u) => u.status !== 'active').length + 7 },
-    { label: 'New wk', value: 121 },
-    { label: 'Churned', value: 18 },
+    { label: 'Active', value: activeUsersCount },
+    { label: 'Suspended', value: suspendedUsersCount },
+    { label: 'New wk', value: newThisWeek },
+    { label: 'Idle 7d', value: Math.max(0, totalRegisteredUsers - (a.active_last_7_days ?? 0)) },
   ];
 
   return (
@@ -161,10 +173,10 @@ export function AdminPage() {
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-base sm:text-lg font-bold">{t.admin.overview.signupTrend}</h2>
             <span className="rounded-full bg-[#5FB032]/15 border border-[#5FB032]/40 text-[#5FB032] px-3 py-1 text-[10px] sm:text-xs font-bold">
-              +18% MoM
+              {signupChange}
             </span>
           </div>
-          <MiniLineChart data={WEEKLY_SIGNUPS} height={170} />
+          <MiniLineChart data={signupsWeekly} height={170} />
         </div>
 
         <div className={`rounded-3xl border ${themeTokens.cardSurface} p-5 sm:p-6 flex flex-col items-center justify-center gap-3`}>
@@ -344,7 +356,8 @@ export function AdminPage() {
                       </span>
                     </div>
                     <div className={`text-xs ${themeTokens.mutedText}`}>
-                      {u.email} • Streak: {u.streak} days
+                      {u.email} • Streak: {u.streak} days • Saved: ${Number(u.savedMoney || 0).toLocaleString()}
+                      {u.joinedAt ? ` • Joined ${u.joinedAt}` : ''}
                     </div>
                   </div>
                 </div>
@@ -357,6 +370,7 @@ export function AdminPage() {
                   >
                     {t.admin.resetUserPhotoBtn}
                   </button>
+                  {u.role !== 'admin' && (
                   <button
                     type="button"
                     onClick={() => handleAdminToggleUserStatus(u.id)}
@@ -366,6 +380,7 @@ export function AdminPage() {
                   >
                     {isActive ? t.admin.suspendBtn : t.admin.activateBtn}
                   </button>
+                  )}
                 </div>
               </div>
             );
