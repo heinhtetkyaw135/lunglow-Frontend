@@ -30,7 +30,6 @@ import { AdminPage } from './pages/Admin/AdminPage';
 import { AdminReportsPage } from './pages/Admin/AdminReportsPage';
 import { AdminCommunityBlogFeedPage } from './pages/Admin/AdminCommunityBlogFeedPage';
 import { AdminBlogPage } from './pages/Admin/AdminBlogPage';
-import { AdminAnalyticsPage } from './pages/Admin/AdminAnalyticsPage';
 import { AdminChallengesPage } from './pages/Admin/AdminChallengesPage';
 import { AdminRequestsPage } from './pages/Admin/AdminRequestsPage';
 import { ChallengesPage } from './pages/Challenges/ChallengesPage';
@@ -57,7 +56,6 @@ const ADMIN_PAGES = [
   'admin-reports',
   'admin-feed',
   'admin-blog',
-  'admin-analytics',
   'admin-challenges',
   'admin-requests',
 ];
@@ -99,7 +97,6 @@ function AppRoutes() {
             {page === 'admin-reports' && <AdminReportsPage />}
             {page === 'admin-feed' && <AdminCommunityBlogFeedPage />}
             {page === 'admin-blog' && <AdminBlogPage />}
-            {page === 'admin-analytics' && <AdminAnalyticsPage />}
             {page === 'admin-challenges' && <AdminChallengesPage />}
             {page === 'admin-requests' && <AdminRequestsPage />}
           </AdminLayout>

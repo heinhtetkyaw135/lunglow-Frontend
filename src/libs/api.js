@@ -143,7 +143,13 @@ export const api = {
 
   // ---- Admin ----
   admin: {
-    analytics: () => request('/admin/analytics/overview'),
+    analytics: (params = {}) => {
+      const qs = new URLSearchParams();
+      if (params.startDate) qs.set('start_date', params.startDate);
+      if (params.endDate) qs.set('end_date', params.endDate);
+      const suffix = qs.toString() ? `?${qs.toString()}` : '';
+      return request(`/admin/analytics/overview${suffix}`);
+    },
     users: (search = '') => request(`/admin/users${search ? `?search=${encodeURIComponent(search)}` : ''}`),
     toggleUserStatus: (id) => request(`/admin/users/${id}/toggle-status`, { method: 'POST' }),
     resetUserAvatar: (id) => request(`/admin/users/${id}/reset-avatar`, { method: 'POST' }),

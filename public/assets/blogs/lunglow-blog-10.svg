@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 540" width="960" height="540">
+  <defs>
+    <linearGradient id="bg10" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#142618" />
+      <stop offset="100%" stop-color="#30622A" />
+    </linearGradient>
+    <radialGradient id="glow10" cx="78%" cy="50%" r="45%">
+      <stop offset="0%" stop-color="#6EC34B" stop-opacity="0.38" />
+      <stop offset="100%" stop-color="#142618" stop-opacity="0" />
+    </radialGradient>
+  </defs>
+  <rect width="960" height="540" fill="url(#bg10)" />
+  <rect width="960" height="540" fill="url(#glow10)" />
+  <circle cx="755" cy="270" r="190" fill="#6EC34B" opacity="0.12" />
+  <circle cx="755" cy="270" r="145" fill="none" stroke="#CABA3A" stroke-width="2.5" stroke-dasharray="10 8" opacity="0.55" />
+  <circle cx="755" cy="270" r="105" fill="#6EC34B" opacity="0.18" />
+  <g transform="translate(755,270)">
+    <path d="M-12,-62 L-12,-15 C-28,-35 -68,-30 -72,12 C-76,52 -45,78 -14,68 L-8,65 L-8,-62 Z" fill="#6EC34B" opacity="0.92" />
+    <path d="M12,-62 L12,-15 C28,-35 68,-30 72,12 C76,52 45,78 14,68 L8,65 L8,-62 Z" fill="#6EC34B" opacity="0.92" />
+    <rect x="-5" y="-76" width="10" height="36" rx="5" fill="#CABA3A" />
+  </g>
+  <rect x="44" y="54" width="528" height="432" rx="28" fill="#081209" fill-opacity="0.58" stroke="#6EC34B" stroke-opacity="0.45" stroke-width="2" />
+  <rect x="68" y="86" width="240" height="34" rx="17" fill="#CABA3A" />
+  <text x="86" y="108" fill="#0B130A" font-family="Inter, system-ui, sans-serif" font-size="13" font-weight="800" letter-spacing="1">CLEAN AIR HOME</text>
+  <text x="510" y="110" fill="#CABA3A" font-family="Inter, system-ui, sans-serif" font-size="16" font-weight="800" text-anchor="end" opacity="0.8">#10</text>
+  <text x="68" y="176" fill="#F5FCF2" font-family="Inter, system-ui, sans-serif" font-size="30" font-weight="800">100% Smoke-Free Family Home</text>
+  <text x="68" y="214" fill="#B9D7B2" font-family="Inter, system-ui, sans-serif" font-size="16" font-weight="500">Protecting Loved Ones &amp; Indoor Air Quality Every Day</text>
+  <rect x="68" y="357" width="32" height="58" rx="8" fill="#6EC34B" opacity="0.9" /><rect x="120" y="328" width="32" height="87" rx="8" fill="#CABA3A" opacity="0.9" /><rect x="172" y="299" width="32" height="116" rx="8" fill="#6EC34B" opacity="0.9" /><rect x="224" y="360" width="32" height="55" rx="8" fill="#CABA3A" opacity="0.9" /><rect x="276" y="331" width="32" height="84" rx="8" fill="#6EC34B" opacity="0.9" /><rect x="328" y="302" width="32" height="113" rx="8" fill="#CABA3A" opacity="0.9" /><rect x="380" y="363" width="32" height="52" rx="8" fill="#6EC34B" opacity="0.9" /><rect x="432" y="334" width="32" height="81" rx="8" fill="#CABA3A" opacity="0.9" />
+  <text x="68" y="452" fill="#9CC88A" font-family="Inter, system-ui, sans-serif" font-size="13" font-weight="700" letter-spacing="1.5">LUNGLOW • SMOKE-FREE COMMUNITY JOURNAL</text>
+</svg>

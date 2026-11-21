@@ -5,7 +5,6 @@ import {
   FlagReportIcon,
   NavChatIcon,
   NavBlogIcon,
-  ChartLineIcon,
   TrophyIcon,
   InboxIcon,
   NavLogoutIcon,
@@ -22,7 +21,6 @@ const ADMIN_NAV = [
   { id: 'admin-reports', icon: FlagReportIcon, badge: 'reports' },
   { id: 'admin-feed', icon: NavChatIcon },
   { id: 'admin-blog', icon: NavBlogIcon },
-  { id: 'admin-analytics', icon: ChartLineIcon },
   { id: 'admin-challenges', icon: TrophyIcon, badge: 'challenges' },
   { id: 'admin-requests', icon: InboxIcon, badge: 'requests' },
 ];

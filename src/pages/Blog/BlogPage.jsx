@@ -312,7 +312,7 @@ export function BlogPage() {
                       onClick={() =>
                         handleOpenReportModal({
                           targetType: 'profile-image',
-                          targetId: blog.id,
+                          targetId: blog.authorId || blog.id,
                           targetAuthor: blog.author,
                           excerpt: `Profile image of ${blog.author}`,
                         })

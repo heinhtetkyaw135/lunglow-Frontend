@@ -43,14 +43,14 @@ export function LunglowDataProvider({ children }) {
     if (path === '/admin/login') return 'admin-login';
     if (path.startsWith('/admin/')) {
       const slug = path.slice('/admin/'.length);
-      return !slug || slug === 'overview' ? 'admin' : `admin-${slug}`;
+      return !slug || slug === 'overview' || slug === 'analytics' ? 'admin' : `admin-${slug}`;
     }
     if (path === '/user/home' || path === '/home') return 'home';
     if (path.startsWith('/user/')) return path.slice('/user/'.length) || 'home';
     return 'landing';
   });
 
-  const ADMIN_PAGE_IDS = ['admin', 'admin-reports', 'admin-feed', 'admin-blog', 'admin-analytics', 'admin-challenges', 'admin-requests'];
+  const ADMIN_PAGE_IDS = ['admin', 'admin-reports', 'admin-feed', 'admin-blog', 'admin-challenges', 'admin-requests'];
 
   const pagePath = useCallback((nextPage) => {
     const routes = {
@@ -94,7 +94,7 @@ export function LunglowDataProvider({ children }) {
       else if (path === '/admin/login') setPageState('admin-login');
       else if (path.startsWith('/admin/')) {
         const slug = path.slice('/admin/'.length);
-        setPageState(!slug || slug === 'overview' ? 'admin' : `admin-${slug}`);
+        setPageState(!slug || slug === 'overview' || slug === 'analytics' ? 'admin' : `admin-${slug}`);
       }
       else if (path.startsWith('/user/')) setPageState(path.slice('/user/'.length) || 'home');
       else setPageState('landing');
@@ -333,7 +333,7 @@ export function LunglowDataProvider({ children }) {
   // Live admin dashboard metrics from GET /admin/analytics/overview (null until loaded).
   const [adminAnalytics, setAdminAnalytics] = useState(null);
   const refreshAdminAnalytics = useCallback(
-    () => api.admin.analytics().then((d) => { if (d) setAdminAnalytics(d); return d; }).catch(() => null),
+    (params = {}) => api.admin.analytics(params).then((d) => { if (d) setAdminAnalytics(d); return d; }).catch(() => null),
     []
   );
   const [reports, setReports] = useState(() => (hasSession() ? [] : INITIAL_REPORTS));
@@ -732,7 +732,27 @@ export function LunglowDataProvider({ children }) {
       reason,
       note,
       excerpt: reportModalTarget.excerpt || '',
-    }).catch(() => {});
+    })
+      .then((d) => {
+        if (d?.report) {
+          setReports((prev) => [
+            {
+              id: d.report.id,
+              targetType: reportModalTarget.targetType,
+              targetId: String(reportModalTarget.targetId),
+              parentId: reportModalTarget.parentId ? String(reportModalTarget.parentId) : null,
+              targetAuthor: reportModalTarget.targetAuthor || 'Community User',
+              reason: note ? `${reason} (${note})` : reason,
+              excerpt: reportModalTarget.excerpt || '',
+              reportedBy: userName || 'Member',
+              status: 'pending',
+              createdAt: 'Just now',
+            },
+            ...prev,
+          ]);
+        }
+      })
+      .catch(() => {});
     setReportModalTarget(null);
     pushNotification({
       title: lang === 'my' ? 'တိုင်ကြားချက် အသစ်' : 'New Report Submitted',
@@ -934,22 +954,34 @@ export function LunglowDataProvider({ children }) {
   const handleAdminResolveReport = (report, action = 'delete') => {
     if (action === 'delete') {
       if (report.targetType === 'blog') {
-        setBlogs((prev) => prev.filter((b) => b.id !== report.targetId));
+        setBlogs((prev) => {
+          const next = prev.filter((b) => b.id !== report.targetId);
+          persistTrackerStorage({ blogs: next });
+          return next;
+        });
       } else if (report.targetType === 'post') {
-        setPosts((prev) => prev.filter((p) => p.id !== report.targetId));
+        setPosts((prev) => {
+          const next = prev.filter((p) => p.id !== report.targetId);
+          persistTrackerStorage({ posts: next });
+          return next;
+        });
       } else if (report.targetType === 'comment') {
-        setBlogs((prev) =>
-          prev.map((b) => ({
+        setBlogs((prev) => {
+          const next = prev.map((b) => ({
             ...b,
             comments: (b.comments || []).filter((c) => c.id !== report.targetId),
-          }))
-        );
-        setPosts((prev) =>
-          prev.map((p) => ({
+          }));
+          persistTrackerStorage({ blogs: next });
+          return next;
+        });
+        setPosts((prev) => {
+          const next = prev.map((p) => ({
             ...p,
             comments: (p.comments || []).filter((c) => c.id !== report.targetId),
-          }))
-        );
+          }));
+          persistTrackerStorage({ posts: next });
+          return next;
+        });
       } else if (report.targetType === 'profile-image') {
         setManagedUsers((prev) =>
           prev.map((u) =>
@@ -974,7 +1006,15 @@ export function LunglowDataProvider({ children }) {
           : 'Report dismissed by Admin.'
       );
     }
-    setReports((prev) => prev.filter((r) => r.id !== report.id));
+    setReports((prev) =>
+      prev.filter((r) => {
+        if (r.id === report.id) return false;
+        if (action === 'delete' && report.targetId && r.targetType === report.targetType && r.targetId === report.targetId) {
+          return false;
+        }
+        return true;
+      })
+    );
     if (typeof report.id === 'number' || /^(rep-)?\d+$/.test(String(report.id))) {
       api.admin.resolveReport(report.id, action).then(refreshAdminAnalytics).catch(() => {});
     }
